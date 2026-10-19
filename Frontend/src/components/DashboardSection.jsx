@@ -4,8 +4,7 @@ import BloodPressureCard from './BloodPressureCard'
 import HistoryCard from './HistoryCard'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-
-const API_BASE = '/api'
+import { API_BASE } from '../config/api'
 
 export default function DashboardSection() {
     const [workloadForm, setWorkloadForm] = useState({

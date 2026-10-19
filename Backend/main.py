@@ -1,9 +1,18 @@
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
-from sqlalchemy.orm import Session
-from typing import List
-import pandas as pd
-import io
+import sys
 import os
+import io
+from pathlib import Path
+from typing import List
+
+# Ensure Backend directory is in sys.path regardless of execution context
+current_dir = Path(__file__).resolve().parent
+if str(current_dir) not in sys.path:
+    sys.path.insert(0, str(current_dir))
+
+import pandas as pd
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, APIRouter
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 
 from database import engine, get_db
 import models
@@ -11,8 +20,6 @@ import schemas
 from policy_engine import analyze_and_predict
 from cache_engine import simulate_metrics
 from prefetch_engine import analyze_pattern
-
-from fastapi.middleware.cors import CORSMiddleware
 
 # Initialize database schemas safely
 try:
@@ -29,26 +36,30 @@ app = FastAPI(
 # CORS configuration
 allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "*")
 origins = [o.strip() for o in allowed_origins_env.split(",") if o.strip()]
+allow_all_origins = "*" in origins or not origins
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins if origins else ["*"],
-    allow_credentials=True,
+    allow_origins=["*"] if allow_all_origins else origins,
+    allow_credentials=False if allow_all_origins else True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+api_router = APIRouter()
+
 MAX_UPLOAD_SIZE = 20 * 1024 * 1024  # 20 MB
 
 @app.get("/")
+@api_router.get("/")
 def root():
     return {"status": "ok", "service": "CacheX Adaptive Cache Engine", "version": "1.0.0"}
 
-@app.get("/health")
+@api_router.get("/health")
 def health_check():
     return {"status": "healthy"}
 
-@app.post("/preview_csv")
+@api_router.post("/preview_csv")
 async def preview_csv(file: UploadFile = File(...)):
     """
     Parses a CSV/JSON file and returns preview rows with exact normalized values.
@@ -91,7 +102,7 @@ async def preview_csv(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=f"Failed to parse file: {str(e)}")
 
 
-@app.post("/upload_file")
+@api_router.post("/upload_file")
 async def upload_workload_file(file: UploadFile = File(...), db: Session = Depends(get_db)):
     """
     Ingests a CSV/JSON telemetry file, extracts sanitized feature averages, and runs ML analysis.
@@ -171,7 +182,7 @@ async def upload_workload_file(file: UploadFile = File(...), db: Session = Depen
         **prediction
     }
 
-@app.post("/upload_workload", response_model=dict)
+@api_router.post("/upload_workload", response_model=dict)
 def upload_workload(workload: schemas.WorkloadInput, db: Session = Depends(get_db)):
     """
     Upload workload data with validated ranges (0.0 to 1.0).
@@ -188,7 +199,7 @@ def upload_workload(workload: schemas.WorkloadInput, db: Session = Depends(get_d
     db.refresh(new_workload)
     return {"message": "Workload uploaded successfully", "workload_id": new_workload.id}
 
-@app.post("/analyze_workload", response_model=schemas.PolicyResponse)
+@api_router.post("/analyze_workload", response_model=schemas.PolicyResponse)
 def analyze_workload(workload_id: int, db: Session = Depends(get_db)):
     """
     Runs workload classification and policy prediction.
@@ -232,7 +243,7 @@ def analyze_workload(workload_id: int, db: Session = Depends(get_db)):
         "created_at": created_at_str
     }
 
-@app.get("/cache_metrics", response_model=schemas.DashboardMetricsResponse)
+@api_router.get("/cache_metrics", response_model=schemas.DashboardMetricsResponse)
 def get_cache_metrics(db: Session = Depends(get_db)):
     """
     Returns metrics correlated with the latest uploaded workload.
@@ -246,7 +257,7 @@ def get_cache_metrics(db: Session = Depends(get_db)):
         )
     return simulate_metrics()
 
-@app.get("/policy_history", response_model=List[schemas.PolicyHistoryItem])
+@api_router.get("/policy_history", response_model=List[schemas.PolicyHistoryItem])
 def get_policy_history(db: Session = Depends(get_db)):
     """
     Returns previous policy predictions safely with null checks.
@@ -262,7 +273,7 @@ def get_policy_history(db: Session = Depends(get_db)):
         })
     return history
 
-@app.get("/dashboard_data")
+@api_router.get("/dashboard_data")
 def get_dashboard_data(db: Session = Depends(get_db)):
     """
     Returns aggregated data for charts based on latest workload.
@@ -275,7 +286,7 @@ def get_dashboard_data(db: Session = Depends(get_db)):
         "policy_history": history
     }
 
-@app.post("/simulate_cache_metrics", response_model=schemas.DashboardMetricsResponse)
+@api_router.post("/simulate_cache_metrics", response_model=schemas.DashboardMetricsResponse)
 def sim_cache_metrics(workload_id: int, db: Session = Depends(get_db)):
     """
     Generate demo metrics and store them for a workload.
@@ -295,7 +306,7 @@ def sim_cache_metrics(workload_id: int, db: Session = Depends(get_db)):
     
     return metrics
 
-@app.post("/simulate_prefetch", response_model=dict)
+@api_router.post("/simulate_prefetch", response_model=dict)
 def simulate_prefetch(workload_id: int, pattern: str, db: Session = Depends(get_db)):
     """
     Detect simple access patterns and predict the next block.
@@ -317,3 +328,8 @@ def simulate_prefetch(workload_id: int, pattern: str, db: Session = Depends(get_
         "predicted_next_block": prediction,
         "confidence": confidence
     }
+
+# Mount routes both at root and with /api prefix for complete compatibility
+app.include_router(api_router)
+app.include_router(api_router, prefix="/api")
+

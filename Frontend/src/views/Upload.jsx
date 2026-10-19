@@ -1,8 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BackgroundBlobs from '../components/BackgroundBlobs'
-
-const API_BASE = '/api'
+import { API_BASE } from '../config/api'
 
 /** Safely parse JSON — won't throw on empty / non-JSON bodies */
 async function safeJson(res) {

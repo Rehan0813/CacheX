@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react'
+import { API_BASE } from '../config/api'
 
 const bars = [
     { h: 45, color: '#93c5fd' },
@@ -25,7 +26,7 @@ export default function BloodPressureCard({ isIdle, refreshTrigger }) {
         const fetchMetrics = async () => {
             if (isIdle) return
             try {
-                const res = await fetch('/api/cache_metrics')
+                const res = await fetch(`${API_BASE}/cache_metrics`)
                 if (res.ok) {
                     const data = await res.json()
                     setAvgLatency(data.latency)

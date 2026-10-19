@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react'
+import { API_BASE } from '../config/api'
 
 // Animated engine throughput waveform on canvas
 export default function EcgCard({ isIdle, refreshTrigger }) {
@@ -11,7 +12,7 @@ export default function EcgCard({ isIdle, refreshTrigger }) {
         const fetchMetrics = async () => {
             if (isIdle) return
             try {
-                const res = await fetch('/api/cache_metrics')
+                const res = await fetch(`${API_BASE}/cache_metrics`)
                 if (res.ok) {
                     const data = await res.json()
                     setRealHitRate(Math.round(data.cache_hit_rate * 100))
