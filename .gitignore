@@ -1,0 +1,41 @@
+# Node / Frontend
+node_modules/
+dist/
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Images
+*.jpg
+*.jpeg
+*.png
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual Environments
+venv/
+.venv/
+env/
+
+# Logs & Temporary Files
+*.log
+*.tmp
+*.bak
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Database (local SQLite)
+*.db
+*.sqlite3
+
+# ML models: exclude random scratch models but keep the trained model weights
+*.pkl
+!Ml_Model/random_forest_model.pkl
+!ml_model/random_forest_model.pkl
